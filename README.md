@@ -1,5 +1,7 @@
 # IntentFlow
 
+[**Try the IntentFlow prototype →**](https://utaknablein.github.io/intentflow/)
+
 A clickable prototype of an **agent-native service experience**. A member says what they need in their own words, and an assistant checks the account, lays out the options with honest tradeoffs, asks for explicit approval, makes the change, and hands back a verified receipt with a one tap undo.
 
 It is a concept test, built to be sent to people for reactions. The company (Alder Club), the member and all data are made up. The assistant is scripted, with no live model behind it, so every tester sees the same experience.
