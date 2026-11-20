@@ -1,6 +1,6 @@
-# IntentFlow
+# Agent-Native Service
 
-[**Try the IntentFlow prototype →**](https://utaknablein.github.io/intentflow/)
+[**Try the prototype →**](https://utaknablein.github.io/agent-native-service/)
 
 A clickable prototype of an **agent-native service experience**. A member says what they need in their own words, and an assistant checks the account, lays out the options with honest tradeoffs, asks for explicit approval, makes the change, and hands back a verified receipt with a one tap undo.
 
@@ -8,7 +8,7 @@ It is a concept test, built to be sent to people for reactions. The company (Ald
 
 ## Try it
 
-Live demo: https://utaknablein.github.io/intentflow/
+Live demo: https://utaknablein.github.io/agent-native-service/
 
 You can also download `index.html` and open it in a browser.
 
@@ -42,7 +42,7 @@ Edit the `CONFIG` block near the top of the script in `index.html`:
 const CONFIG = {
   feedbackEmail: "",      // adds an "Email my answers" button
   feedbackEndpoint: "",   // JSON POST target, for example a Formspree form URL
-  studyName: "IntentFlow prototype v0.1"
+  studyName: "Agent-Native Service prototype v0.1"
 };
 ```
 
