@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IntentFlow: an agent-native service experience (prototype)</title>
+<meta name="description" content="A clickable prototype of an agent-native membership change: intent, options, tradeoffs, consent, action, verified receipt.">
+<style>
+:root{
+  --bg:#f6f2ea; --card:#fffdf8; --ink:#1d2a26; --muted:#5f6b66; --line:#e2dbcd;
+  --brand:#1f4d3f; --brand-ink:#ffffff; --soft:#e7efe9; --accent:#c8643b;
+  --warn:#8a5a00; --warn-bg:#fbf1d9; --ok:#1f6b4a; --ok-bg:#e3f2e8;
+  --radius:14px; --shadow:0 1px 2px rgba(29,42,38,.06),0 8px 24px rgba(29,42,38,.06);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer}
+h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.2;margin:0}
+p{margin:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+.banner{background:var(--ink);color:#e9e4d8;font-size:13px;text-align:center;padding:7px 16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1120px;margin:0 auto;padding:18px 20px 6px}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:20px;font-weight:600}
+.logo i{width:28px;height:28px;border-radius:9px;background:var(--brand);display:grid;place-items:center;color:#fff;font-style:normal;font-size:15px}
+.who{font-size:14px;color:var(--muted);text-align:right}
+.who b{color:var(--ink);font-weight:600}
+
+.steps{max-width:1120px;margin:10px auto 0;padding:0 20px;display:flex;gap:6px;list-style:none}
+.steps li{flex:1;font-size:12.5px;color:var(--muted);padding-top:9px;border-top:3px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps li.on{border-color:var(--brand);color:var(--ink);font-weight:600}
+.steps li.done{border-color:#8fb3a3}
+
+.wrap{max-width:1120px;margin:0 auto;padding:22px 20px 60px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}.steps li{font-size:0;padding-top:0}.who span{display:none}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.stage{padding:28px}
+@media (max-width:560px){.stage{padding:20px}}
+.stage h1{font-size:30px;margin-bottom:8px}
+.stage h2{font-size:24px;margin-bottom:6px}
+.lede{color:var(--muted);margin-bottom:22px;max-width:60ch}
+.fade{animation:fade .35s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+.ask{display:flex;gap:10px;margin-bottom:14px}
+.ask input{flex:1;min-width:0;font:inherit;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+.ask input:focus{border-color:var(--brand);outline:none}
+.btn{background:var(--brand);color:var(--brand-ink);border:0;border-radius:12px;padding:13px 20px;font-weight:600}
+.btn:hover{background:#17392f}
+.btn[disabled]{background:#b9c4bf;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--brand);border:1.5px solid var(--line)}
+.btn.ghost:hover{background:var(--soft)}
+.btn.link{background:none;color:var(--brand);padding:6px 2px;text-decoration:underline;border-radius:4px;font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--soft);color:var(--brand);border:1px solid transparent;border-radius:999px;padding:9px 15px;font-size:14.5px}
+.chip:hover{border-color:var(--brand)}
+.hint{font-size:13.5px;color:var(--muted);margin:18px 0 8px}
+.note{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 14px;font-size:14px;margin-bottom:14px}
+
+.said{font-size:14px;color:var(--muted);margin-bottom:14px}
+.said q{color:var(--ink);font-style:italic}
+.checked{background:var(--soft);border-radius:12px;padding:14px 16px;margin:16px 0 22px}
+.checked h3{font-family:var(--sans);font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);margin-bottom:8px}
+.checked ul{margin:0;padding:0;list-style:none;font-size:14.5px}
+.checked li{padding:3px 0 3px 22px;position:relative;opacity:0;animation:fade .3s ease forwards}
+.checked li::before{content:"";position:absolute;left:2px;top:10px;width:10px;height:6px;border-left:2px solid var(--ok);border-bottom:2px solid var(--ok);transform:rotate(-45deg)}
+
+.opts{display:grid;gap:14px}
+.opt{border:1.5px solid var(--line);border-radius:14px;padding:18px;background:#fff;position:relative}
+.opt.rec{border-color:var(--brand)}
+.tag{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.03em;border-radius:999px;padding:3px 10px;margin-bottom:8px;background:var(--brand);color:#fff}
+.tag.asked{background:var(--ink)}
+.opt-head{display:flex;justify-content:space-between;gap:14px;align-items:baseline;flex-wrap:wrap}
+.opt h3{font-size:19px}
+.price{font-weight:600;white-space:nowrap}
+.why{font-size:14.5px;color:var(--muted);margin:6px 0 12px}
+.trade{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:14.5px;margin-bottom:14px}
+@media (max-width:560px){.trade{grid-template-columns:1fr}}
+.trade h4{margin:0 0 4px;font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.trade ul{margin:0;padding-left:18px}
+.trade li{margin:2px 0}
+.rev{font-size:13.5px;color:var(--muted);margin-bottom:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+table.diff{width:100%;border-collapse:collapse;margin:14px 0 18px;font-size:15px}
+.diff th{text-align:left;font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+.diff td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.diff td:first-child{color:var(--muted)}
+.diff .was{text-decoration:line-through;color:var(--muted)}
+.diff .now{font-weight:600}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media (max-width:560px){.two{grid-template-columns:1fr}}
+.box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14.5px;background:#fff}
+.box h3{font-family:var(--sans);font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.box ul{margin:0;padding-left:18px}
+.consent{display:flex;gap:12px;align-items:flex-start;background:var(--soft);border-radius:12px;padding:14px 16px;margin-bottom:16px;cursor:pointer}
+.consent input{width:20px;height:20px;margin-top:2px;accent-color:var(--brand);flex:none}
+.handoff{margin-top:16px;border:1.5px dashed var(--line);border-radius:12px;padding:14px 16px;font-size:14.5px}
+
+.run{list-style:none;margin:18px 0;padding:0}
+.run li{display:flex;gap:12px;align-items:center;padding:9px 0;color:var(--muted)}
+.run li .dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:12px;color:#fff}
+.run li.active{color:var(--ink)}
+.run li.active .dot{border-color:var(--brand);border-top-color:transparent;animation:spin .8s linear infinite}
+.run li.ok{color:var(--ink)}
+.run li.ok .dot{background:var(--ok);border-color:var(--ok)}
+.run li.ok .dot::after{content:"\2713"}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.verified{display:flex;gap:12px;align-items:flex-start;background:var(--ok-bg);color:var(--ok);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:15px}
+.verified.undone{background:var(--warn-bg);color:var(--warn)}
+.verified b{display:block}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13.5px;color:var(--muted);margin-bottom:6px}
+.meta b{color:var(--ink);font-weight:600}
+
+.q{margin-bottom:22px}
+.q legend,.q label.t{font-weight:600;margin-bottom:8px;display:block;padding:0}
+fieldset.q{border:0;padding:0;margin:0 0 22px}
+.scale{display:flex;gap:8px;flex-wrap:wrap}
+.scale label{flex:1;min-width:52px;text-align:center;border:1.5px solid var(--line);border-radius:10px;padding:9px 6px;background:#fff;cursor:pointer;font-size:14.5px}
+.scale input{position:absolute;opacity:0}
+.scale label:has(input:checked){background:var(--brand);border-color:var(--brand);color:#fff}
+.scale label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
+.ends{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-top:5px}
+textarea,.q input[type=text]{width:100%;font:inherit;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:84px;resize:vertical}
+pre.out{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:13px;max-height:260px;overflow:auto;margin:14px 0}
+
+aside{display:grid;gap:16px;position:sticky;top:16px}
+@media (max-width:900px){aside{position:static}}
+.panel{padding:18px}
+.panel h2{font-family:var(--sans);font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px}
+.acct{font-size:14.5px;display:grid;gap:6px}
+.acct div{display:flex;justify-content:space-between;gap:12px}
+.acct span{color:var(--muted)}
+.acct b{font-weight:600;text-align:right}
+.acct b.flash{animation:flash 1.4s ease}
+@keyframes flash{0%{background:#ffe7a8}100%{background:transparent}}
+.perm{font-size:14px;margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.perm b{font-weight:600}
+.log{list-style:none;margin:0;padding:0;font-size:13.5px;max-height:280px;overflow:auto}
+.log li{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:10px}
+.log li:last-child{border-bottom:0}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+.log .empty{color:var(--muted)}
+footer{max-width:1120px;margin:0 auto;padding:0 20px 40px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="banner">Prototype with made-up data. Alder Club and this account are fictional, and nothing you do here changes anything real.</div>
+
+<header class="top">
+  <div class="logo"><i aria-hidden="true">A</i>Alder Club</div>
+  <div class="who"><b>Sam Rivera</b><br><span>Member since 2023</span></div>
+</header>
+
+<ol class="steps" id="steps" aria-label="Progress">
+  <li>1. Say what you need</li>
+  <li>2. Compare options</li>
+  <li>3. Review and approve</li>
+  <li>4. Verified outcome</li>
+  <li>5. Your feedback</li>
+</ol>
+
+<div class="wrap">
+  <main class="card stage" id="stage" tabindex="-1" aria-live="polite"></main>
+
+  <aside>
+    <section class="card panel" aria-label="Your account">
+      <h2>Your account</h2>
+      <div class="acct" id="acct"></div>
+    </section>
+    <section class="card panel" aria-label="What the assistant is allowed to do">
+      <h2>What the assistant may do</h2>
+      <ul class="perm">
+        <li><b>Can read:</b> your plan, billing dates, visit history</li>
+        <li><b>Can change:</b> only what you approve, one change at a time</li>
+        <li><b>Cannot touch:</b> payment methods, personal details</li>
+      </ul>
+    </section>
+    <section class="card panel" aria-label="Activity log">
+      <h2>Activity log</h2>
+      <ul class="log" id="log"><li class="empty">Nothing yet. Every read and every change will show up here.</li></ul>
+    </section>
+  </aside>
+</div>
+
+<footer>IntentFlow is a concept prototype of an agent-native service experience. The assistant's replies are scripted, not generated by a live model.</footer>
+
+<script>
+/* ---------------------------------------------------------------
+   CONFIG: edit these three lines before you send the link out.
+   feedbackEmail    : testers get an "Email my answers" button.
+   feedbackEndpoint : a form endpoint that accepts a JSON POST
+                      (for example a Formspree form URL).
+   Leave both empty and testers can still copy their answers.
+---------------------------------------------------------------- */
+const CONFIG = {
+  feedbackEmail: "",
+  feedbackEndpoint: "",
+  studyName: "IntentFlow prototype v0.1"
+};
+
+const BASE_ACCOUNT = {
+  "Plan": "Alder Plus",
+  "Monthly price": "$49",
+  "Status": "Active",
+  "Next charge": "$49 on Dec 3, 2026",
+  "Club access": "All hours",
+  "Classes": "8 credits a month",
+  "Guest passes": "2 a month"
+};
+
+const NEVER = [
+  "Change your payment method",
+  "Sign you up for anything you did not pick",
+  "Use this request to send you offers"
+];
+
+const INTENTS = {
+  pause: {
+    chip: "Pause my membership while I travel",
+    match: /pause|freez|hold|travel|away|break|vacation|trip/i,
+    understood: "You want to stop paying for a while without losing your membership.",
+    checked: [
+      "Your plan: Alder Plus at $49 a month",
+      "Next charge: December 3, 2026",
+      "Pause allowance: 3 months a year, none used so far",
+      "Your rate is locked at $49 (new members pay $55)"
+    ],
+    options: [
+      { id:"pause1", title:"Pause for 1 month", price:"$0 in December", tag:"rec",
+        why:"You have not used any pause months this year and one month covers most trips. You can extend it later if you need to.",
+        keep:["Your $49 rate lock","Unused class credits roll over"],
+        lose:["Club access from Dec 3 to Jan 2"],
+        rev:"You can resume early at any time.",
+        changes:{ "Status":"Paused Dec 3 to Jan 2", "Next charge":"$49 on Jan 3, 2027", "Club access":"Paused until Jan 3" },
+        effective:"December 3, 2026", work:"Scheduling a 1 month pause" },
+      { id:"pause3", title:"Pause for 3 months", price:"$0 until March",
+        why:"Longest break available. It uses your whole pause allowance for the year.",
+        keep:["Your $49 rate lock"],
+        lose:["Club access from Dec 3 to Mar 2","All 3 pause months for this year","4 class credits that expire Jan 31"],
+        rev:"You can resume early at any time. Used pause months do not come back.",
+        changes:{ "Status":"Paused Dec 3 to Mar 2", "Next charge":"$49 on Mar 3, 2027", "Club access":"Paused until Mar 3" },
+        effective:"December 3, 2026", work:"Scheduling a 3 month pause" },
+      { id:"digital", title:"Switch to Digital while you are away", price:"$15 a month",
+        why:"Keeps the on-demand classes in the app so you can train on the road.",
+        keep:["On-demand classes in the app","Your $49 rate lock for 6 months"],
+        lose:["Club access","In-club class credits","Guest passes"],
+        rev:"Switch back to Plus at $49 any time in the next 6 months.",
+        changes:{ "Plan":"Alder Digital", "Monthly price":"$15", "Next charge":"$15 on Dec 3, 2026", "Club access":"None (app only)", "Classes":"On-demand only", "Guest passes":"None" },
+        effective:"December 3, 2026", work:"Moving your plan to Alder Digital" }
+    ]
+  },
+  lower: {
+    chip: "Lower my monthly cost",
+    match: /cheap|lower|less|save|saving|expens|cost|downgrade|afford|reduce|too much/i,
+    understood: "You want to pay less each month and keep what you actually use.",
+    checked: [
+      "Your plan: Alder Plus at $49 a month",
+      "Last 90 days: 11 club visits, 0 classes booked, 0 guest passes used",
+      "7 of those 11 visits were on weekdays between 5 and 8 pm",
+      "Plans open to you: Core, Plus Off-Peak, Plus Annual"
+    ],
+    options: [
+      { id:"core", title:"Move to Alder Core", price:"$29 a month (save $20)", tag:"rec",
+        why:"You have not booked a class or used a guest pass in 90 days, so Core covers how you actually use the club.",
+        keep:["Full club access, all hours","Your locker and app"],
+        lose:["8 class credits a month","2 guest passes a month"],
+        rev:"Move back to Plus any time. Your $49 rate is held for 6 months.",
+        changes:{ "Plan":"Alder Core", "Monthly price":"$29", "Next charge":"$29 on Dec 3, 2026", "Classes":"Pay per class ($12)", "Guest passes":"None" },
+        effective:"December 3, 2026", work:"Moving your plan to Alder Core" },
+      { id:"offpeak", title:"Switch to Plus Off-Peak", price:"$35 a month (save $14)",
+        why:"Keeps classes and guest passes. Worth knowing: most of your recent visits fall inside the hours this plan excludes.",
+        keep:["8 class credits a month","2 guest passes a month"],
+        lose:["Access on weekdays from 5 to 8 pm, when 7 of your last 11 visits happened"],
+        rev:"Move back to full Plus any time.",
+        changes:{ "Plan":"Alder Plus Off-Peak", "Monthly price":"$35", "Next charge":"$35 on Dec 3, 2026", "Club access":"All hours except weekdays 5 to 8 pm" },
+        effective:"December 3, 2026", work:"Moving your plan to Plus Off-Peak" },
+      { id:"annual", title:"Pay yearly for Plus", price:"$492 a year ($41 a month)",
+        why:"Same plan for less, in exchange for paying up front.",
+        keep:["Everything in Plus"],
+        lose:["Month to month flexibility","$492 is charged at once on Dec 3","Refunds are prorated in the first 30 days only"],
+        rev:"Harder to reverse than the other two after the first 30 days.",
+        changes:{ "Plan":"Alder Plus (annual)", "Monthly price":"$41 equivalent", "Next charge":"$492 on Dec 3, 2026" },
+        effective:"December 3, 2026", work:"Switching you to annual billing" }
+    ]
+  },
+  add: {
+    chip: "Add my partner to my plan",
+    match: /partner|add |wife|husband|spouse|friend|family|guest|girlfriend|boyfriend|someone/i,
+    understood: "You want your partner to be able to use the club with you.",
+    checked: [
+      "Your plan: Alder Plus at $49 a month",
+      "Guest passes: 2 a month, 2 left this month",
+      "Alder Duo is available at your club",
+      "New member rate for a separate Plus plan: $55"
+    ],
+    options: [
+      { id:"duo", title:"Upgrade to Alder Duo", price:"$79 a month for two (+$30)", tag:"rec",
+        why:"If your partner will come more than twice a month, Duo costs less than any other way of adding them.",
+        keep:["Everything in Plus, for both of you","Your current billing date"],
+        lose:["Nothing from your plan. Your partner confirms their own login by email."],
+        rev:"Drop back to a single Plus plan at $49 any time.",
+        changes:{ "Plan":"Alder Duo (2 members)", "Monthly price":"$79", "Next charge":"$79 on Dec 3, 2026", "Classes":"8 credits a month each", "Guest passes":"2 a month each" },
+        effective:"Today, with the new price from December 3", work:"Upgrading your plan to Alder Duo" },
+      { id:"pack", title:"Add a 5 visit guest pack", price:"$20 once",
+        why:"Good for trying it out. Your plan stays exactly as it is.",
+        keep:["Your plan and price, unchanged"],
+        lose:["Passes expire after 60 days","Your partner can only visit together with you"],
+        rev:"Unused packs can be refunded within 14 days.",
+        changes:{ "Guest passes":"2 a month, plus 5 extra until Jan 19", "Next charge":"$49 on Dec 3, 2026, plus $20 today" },
+        effective:"Today", work:"Adding a 5 visit guest pack" },
+      { id:"second", title:"A separate Plus membership for them", price:"$55 a month for them",
+        why:"Their own account, schedule and billing. It costs $25 a month more than Duo.",
+        keep:["Your plan and price, unchanged","Fully separate accounts"],
+        lose:["$25 a month compared with Duo"],
+        rev:"They can cancel any time. Month to month.",
+        changes:{ "Linked member":"Invite sent to your partner" },
+        effective:"When your partner accepts the invite", work:"Preparing an invite for your partner" }
+    ]
+  },
+  cancel: {
+    chip: "Cancel my membership",
+    match: /cancel|quit|end my|leave|terminat|stop my membership|close my/i,
+    understood: "You want to end your membership.",
+    checked: [
+      "Your plan: Alder Plus at $49 a month",
+      "Contract: month to month, no cancellation fee",
+      "Paid through: December 2, 2026",
+      "Rejoining later would be at the new member rate of $55"
+    ],
+    options: [
+      { id:"cancel", title:"Cancel my membership", price:"$0 after December 2", tag:"asked",
+        why:"This is what you asked for and it is ready to go. No fee, no phone call.",
+        keep:["Full access through December 2","Your account history for 12 months"],
+        lose:["Your $49 rate lock (rejoining costs $55)","Unused class credits on December 2"],
+        rev:"You can undo this any time before December 2.",
+        changes:{ "Status":"Ends Dec 2, 2026", "Next charge":"None", "Club access":"All hours until Dec 2" },
+        effective:"December 2, 2026", work:"Scheduling your cancellation" },
+      { id:"pause1", title:"Pause for 1 month instead", price:"$0 in December",
+        why:"Only if a break would do. It keeps your $49 rate.",
+        keep:["Your $49 rate lock","Unused class credits roll over"],
+        lose:["Club access from Dec 3 to Jan 2"],
+        rev:"You can resume early, or still cancel, at any time.",
+        changes:{ "Status":"Paused Dec 3 to Jan 2", "Next charge":"$49 on Jan 3, 2027", "Club access":"Paused until Jan 3" },
+        effective:"December 3, 2026", work:"Scheduling a 1 month pause" },
+      { id:"core", title:"Move to Alder Core instead", price:"$29 a month",
+        why:"Only if price is the reason. You keep full club access.",
+        keep:["Full club access, all hours"],
+        lose:["8 class credits a month","2 guest passes a month"],
+        rev:"You can still cancel at any time.",
+        changes:{ "Plan":"Alder Core", "Monthly price":"$29", "Next charge":"$29 on Dec 3, 2026", "Classes":"Pay per class ($12)", "Guest passes":"None" },
+        effective:"December 3, 2026", work:"Moving your plan to Alder Core" }
+    ]
+  }
+};
+
+/* ------------------------- state ------------------------- */
+const S = {
+  step: 1, intent: null, option: null, said: "", account: {...BASE_ACCOUNT},
+  log: [], undone: false, handoff: false, backs: 0, ref: "", started: Date.now(), submitted: false
+};
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const stage = $("#stage");
+const now = () => new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+
+function log(text){
+  S.log.push({t: now(), text});
+  $("#log").innerHTML = S.log.map(e => `<li><time>${e.t}</time><span>${esc(e.text)}</span></li>`).join("");
+  $("#log").scrollTop = 1e6;
+}
+function renderAccount(changed=[]){
+  $("#acct").innerHTML = Object.entries(S.account).map(([k,v]) =>
+    `<div><span>${esc(k)}</span><b class="${changed.includes(k) ? "flash" : ""}">${esc(v)}</b></div>`).join("");
+}
+function setStep(n){
+  S.step = n;
+  [...$("#steps").children].forEach((li,i) => {
+    li.className = i+1 === n ? "on" : (i+1 < n ? "done" : "");
+    if (i+1 === n) li.setAttribute("aria-current","step"); else li.removeAttribute("aria-current");
+  });
+}
+function show(html){
+  stage.innerHTML = `<div class="fade">${html}</div>`;
+  stage.focus({preventScroll:true});
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+const intent = () => INTENTS[S.intent];
+const option = () => intent().options.find(o => o.id === S.option);
+
+/* ------------------------- 1. ask ------------------------- */
+function viewAsk(miss){
+  setStep(1);
+  show(`
+    <h1>Hi Sam. What would you like to change?</h1>
+    <p class="lede">Tell me in your own words. I will check your account, show you the options with their tradeoffs, and change nothing until you approve it.</p>
+    ${miss ? `<p class="note">I did not catch that one. This prototype handles the four membership changes below, so try one of those.</p>` : ""}
+    <form class="ask" id="askForm">
+      <label class="sr" for="ask">What would you like to change?</label>
+      <input id="ask" autocomplete="off" placeholder="For example: I am away in December and do not want to pay" value="${miss ? esc(S.said) : ""}">
+      <button class="btn" type="submit">Continue</button>
+    </form>
+    <p class="hint">Or pick one:</p>
+    <div class="chips">
+      ${Object.entries(INTENTS).map(([k,i]) => `<button class="chip" data-intent="${k}">${esc(i.chip)}</button>`).join("")}
+    </div>`);
+  $("#askForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const text = $("#ask").value.trim();
+    if (!text) { $("#ask").focus(); return; }
+    S.said = text;
+    const order = ["cancel","pause","add","lower"];
+    const hit = order.find(k => INTENTS[k].match.test(text));
+    if (!hit) { log("Could not match the request to a supported change"); return viewAsk(true); }
+    startIntent(hit);
+  });
+  stage.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+    S.said = INTENTS[b.dataset.intent].chip; startIntent(b.dataset.intent);
+  }));
+}
+function startIntent(k){
+  S.intent = k; S.option = null; S.handoff = false;
+  log(`Understood request: "${S.said}"`);
+  log("Read plan, billing dates and visit history (read only)");
+  viewOptions(true);
+}
+
+/* ------------------------- 2. options ------------------------- */
+function viewOptions(first){
+  setStep(2);
+  const it = intent();
+  const tagHtml = o => o.tag === "rec" ? `<span class="tag">Suggested for you</span>` :
+                       o.tag === "asked" ? `<span class="tag asked">What you asked for</span>` : "";
+  show(`
+    <p class="said">You said: <q>${esc(S.said)}</q> <button class="btn link" id="restart">Change this</button></p>
+    <h2>${esc(it.understood)}</h2>
+    <div class="checked">
+      <h3>What I checked on your account</h3>
+      <ul>${it.checked.map((c,i) => `<li style="animation-delay:${first ? i*0.35 : 0}s">${esc(c)}</li>`).join("")}</ul>
+    </div>
+    <p class="lede">Here are three ways to do it. Nothing has changed yet.</p>
+    <div class="opts">
+      ${it.options.map(o => `
+        <article class="opt ${o.tag ? "rec" : ""}">
+          ${tagHtml(o)}
+          <div class="opt-head"><h3>${esc(o.title)}</h3><span class="price">${esc(o.price)}</span></div>
+          <p class="why">${esc(o.why)}</p>
+          <div class="trade">
+            <div><h4>You keep</h4><ul>${o.keep.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+            <div><h4>You give up</h4><ul>${o.lose.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          </div>
+          <p class="rev">${esc(o.rev)}</p>
+          <button class="btn ${o.tag ? "" : "ghost"}" data-opt="${o.id}">Review this option</button>
+        </article>`).join("")}
+    </div>`);
+  $("#restart").addEventListener("click", () => { log("Went back to change the request"); viewAsk(); });
+  stage.querySelectorAll("[data-opt]").forEach(b => b.addEventListener("click", () => {
+    S.option = b.dataset.opt;
+    log(`Selected for review: ${option().title}`);
+    viewApprove();
+  }));
+}
+
+/* ------------------------- 3. approve ------------------------- */
+function diffRows(o){
+  return Object.entries(o.changes).map(([k,v]) =>
+    `<tr><td>${esc(k)}</td><td class="was">${esc(BASE_ACCOUNT[k] || "None")}</td><td class="now">${esc(v)}</td></tr>`).join("");
+}
+function viewApprove(){
+  setStep(3);
+  const o = option();
+  show(`
+    <h2>Here is exactly what I will do</h2>
+    <p class="lede">${esc(o.title)}. Please check the details. I will only go ahead once you approve.</p>
+    <table class="diff">
+      <thead><tr><th>On your account</th><th>Now</th><th>After</th></tr></thead>
+      <tbody>${diffRows(o)}</tbody>
+    </table>
+    <div class="two">
+      <div class="box"><h3>When and how to undo</h3>
+        <ul><li>Takes effect: ${esc(o.effective)}</li><li>${esc(o.rev)}</li><li>One tap undo from your receipt</li></ul></div>
+      <div class="box"><h3>What I will not do</h3>
+        <ul>${NEVER.map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>
+    </div>
+    <label class="consent"><input type="checkbox" id="ok">
+      <span>I approve this change to my account: <b>${esc(o.title)}</b>, ${esc(o.price)}.</span></label>
+    <div class="row">
+      <button class="btn" id="go" disabled>Approve and make the change</button>
+      <button class="btn ghost" id="back">Back to options</button>
+      <button class="btn link" id="human">Talk to a person instead</button>
+    </div>
+    <div id="handoff"></div>`);
+  $("#ok").addEventListener("change", e => { $("#go").disabled = !e.target.checked; });
+  $("#back").addEventListener("click", () => { S.backs++; log("Went back to compare options"); viewOptions(false); });
+  $("#human").addEventListener("click", () => {
+    S.handoff = true; log("Asked for a person. Prepared a summary for handoff, nothing changed");
+    $("#handoff").innerHTML = `<div class="handoff fade"><b>No problem. Nothing has been changed.</b><br>
+      In the real product a team member would pick this up with a summary of your request, what I checked and the option you were reviewing, so you would not need to explain it again. In this prototype you can keep going or go back.</div>`;
+  });
+  $("#go").addEventListener("click", () => { log(`Approval given by member: ${o.title}`); viewRun(); });
+}
+
+/* ------------------------- 4. run + receipt ------------------------- */
+function viewRun(){
+  setStep(4);
+  const o = option();
+  const tasks = ["Confirming this request matches what you approved", o.work, "Updating your next charge", "Re-reading your account to verify the result"];
+  show(`
+    <h2>Making the change</h2>
+    <p class="lede">This takes a few seconds.</p>
+    <ul class="run">${tasks.map(t => `<li><span class="dot" aria-hidden="true"></span><span>${esc(t)}</span></li>`).join("")}</ul>`);
+  const items = [...stage.querySelectorAll(".run li")];
+  let i = 0;
+  (function next(){
+    if (i > 0) { items[i-1].className = "ok"; log(tasks[i-1] + ": done"); }
+    if (i === items.length) return setTimeout(applyAndReceipt, 350);
+    items[i].className = "active"; i++;
+    setTimeout(next, 850);
+  })();
+}
+function applyAndReceipt(){
+  const o = option();
+  S.account = {...BASE_ACCOUNT, ...o.changes};
+  S.undone = false;
+  S.ref = "AL-" + Math.random().toString(36).slice(2,8).toUpperCase();
+  renderAccount(Object.keys(o.changes));
+  log(`Verified. Reference ${S.ref}`);
+  viewReceipt();
+}
+function viewReceipt(){
+  setStep(4);
+  const o = option();
+  show(`
+    <h2>${S.undone ? "Change reversed" : "Done. Here is your receipt"}</h2>
+    <div class="verified ${S.undone ? "undone" : ""}">
+      <span aria-hidden="true">${S.undone ? "↩" : "✓"}</span>
+      <span>${S.undone
+        ? `<b>Your account is back to how it was.</b>I reversed the change and re-read your account to confirm it matches the original.`
+        : `<b>Verified against your account.</b>After making the change I re-read your account, and it matches what you approved.`}</span>
+    </div>
+    <div class="meta"><span>Reference <b>${esc(S.ref)}</b></span><span>Approved by <b>Sam Rivera</b></span><span>${new Date().toLocaleString([], {dateStyle:"medium", timeStyle:"short"})}</span></div>
+    <table class="diff">
+      <thead><tr><th>${esc(o.title)}</th><th>Before</th><th>${S.undone ? "Was changed to" : "Now"}</th></tr></thead>
+      <tbody>${diffRows(o)}</tbody>
+    </table>
+    <p class="rev">${S.undone ? "Nothing further is scheduled." : `Takes effect: ${esc(o.effective)}. ${esc(o.rev)} A copy was sent to s•••@example.com.`}</p>
+    <div class="row">
+      <button class="btn" id="fb">Share your feedback (2 minutes)</button>
+      ${S.undone ? "" : `<button class="btn ghost" id="undo">Undo this change</button>`}
+      <button class="btn link" id="again">Try another request</button>
+    </div>`);
+  $("#fb").addEventListener("click", viewFeedback);
+  $("#again").addEventListener("click", () => { resetAccount(); viewAsk(); });
+  const u = $("#undo");
+  if (u) u.addEventListener("click", () => {
+    S.undone = true; S.account = {...BASE_ACCOUNT};
+    renderAccount(Object.keys(o.changes));
+    log(`Change reversed at member's request. Reference ${S.ref}`);
+    viewReceipt();
+  });
+}
+function resetAccount(){
+  S.account = {...BASE_ACCOUNT}; renderAccount(); log("Prototype reset for a new request");
+}
+
+/* ------------------------- 5. feedback ------------------------- */
+const scale = (name, lo, hi) => `
+  <div class="scale">${[1,2,3,4,5].map(n => `<label><input type="radio" name="${name}" value="${n}">${n}</label>`).join("")}</div>
+  <div class="ends"><span>${lo}</span><span>${hi}</span></div>`;
+function viewFeedback(){
+  setStep(5);
+  show(`
+    <h2>How was that?</h2>
+    <p class="lede">Five quick questions. Honest reactions help most, including the critical ones.</p>
+    <form id="fbForm">
+      <fieldset class="q"><legend>1. How clear was it what the assistant was about to do?</legend>${scale("clarity","Not clear","Very clear")}</fieldset>
+      <fieldset class="q"><legend>2. How comfortable were you letting it make the change?</legend>${scale("trust","Not comfortable","Very comfortable")}</fieldset>
+      <fieldset class="q"><legend>3. Compared with how you would do this today (app menus, a call, a chat)?</legend>${scale("compare","Much worse","Much better")}</fieldset>
+      <div class="q"><label class="t" for="unsure">4. Was there a moment you felt unsure or wanted more control?</label><textarea id="unsure" name="unsure"></textarea></div>
+      <div class="q"><label class="t" for="missing">5. What would it need before you would use it on a real account?</label><textarea id="missing" name="missing"></textarea></div>
+      <div class="q"><label class="t" for="role">Your role and company (optional)</label><input type="text" id="role" name="role"></div>
+      <div class="row"><button class="btn" type="submit">Finish</button><button class="btn link" type="button" id="backR">Back to receipt</button></div>
+    </form>`);
+  $("#backR").addEventListener("click", viewReceipt);
+  $("#fbForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const o = option();
+    const data = {
+      study: CONFIG.studyName,
+      request: S.said, intent: S.intent, option: o.title,
+      undone: S.undone, asked_for_person: S.handoff, went_back_to_options: S.backs,
+      seconds_in_session: Math.round((Date.now() - S.started) / 1000),
+      clarity: f.get("clarity") || "", trust: f.get("trust") || "", compare: f.get("compare") || "",
+      unsure: (f.get("unsure") || "").trim(), missing: (f.get("missing") || "").trim(), role: (f.get("role") || "").trim()
+    };
+    viewThanks(data);
+  });
+}
+function viewThanks(data){
+  const text = Object.entries(data).map(([k,v]) => `${k}: ${v}`).join("\n");
+  const mail = CONFIG.feedbackEmail
+    ? `<a class="btn" href="mailto:${encodeURIComponent(CONFIG.feedbackEmail)}?subject=${encodeURIComponent(CONFIG.studyName + " feedback")}&body=${encodeURIComponent(text)}">Email my answers</a>` : "";
+  show(`
+    <h2>Thank you. That is really helpful.</h2>
+    <p class="lede" id="sendMsg">${CONFIG.feedbackEndpoint ? "Sending your answers..." : (CONFIG.feedbackEmail ? "One last step: send your answers with the button below." : "One last step: copy your answers and send them back to the person who shared this link.")}</p>
+    <pre class="out" id="out">${esc(text)}</pre>
+    <div class="row">${mail}<button class="btn ${mail ? "ghost" : ""}" id="copy">Copy my answers</button><button class="btn link" id="again">Try another request</button></div>`);
+  $("#copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(text); $("#copy").textContent = "Copied"; }
+    catch { const r = document.createRange(); r.selectNodeContents($("#out")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("#copy").textContent = "Selected. Press Ctrl or Cmd + C"; }
+  });
+  $("#again").addEventListener("click", () => { resetAccount(); viewAsk(); });
+  if (CONFIG.feedbackEndpoint) {
+    fetch(CONFIG.feedbackEndpoint, {method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"}, body: JSON.stringify(data)})
+      .then(r => { $("#sendMsg").textContent = r.ok ? "Your answers were sent. You can close this tab." : "Sending did not work, so please copy your answers below and send them back."; })
+      .catch(() => { $("#sendMsg").textContent = "Sending did not work, so please copy your answers below and send them back."; });
+  }
+}
+
+renderAccount();
+viewAsk();
+</script>
+</body>
+</html>
